@@ -1,0 +1,789 @@
+---
+title: "Homework 1"
+author: "Xingche Guo and Yueying Wang"
+date: "2/17/2019"
+output: pdf_document
+---
+
+# 1.6 
+
+```{r, include=FALSE}
+library(ggplot2)
+library(readxl)
+library(gridExtra)
+```
+
+
+```{r, include=TRUE, echo=FALSE, warning=FALSE}
+Dist <- function(n, p){
+  X <- matrix(runif(n * p), nrow = n, ncol = p)
+  Dist.X <- lapply(1:(n-1), function(i){
+    xi <- X[i,]
+    xjs <- matrix(X[(i+1):n,],ncol = p)
+    dist.xi <- apply(xjs, 1, function(x){return(sqrt(sum((x-xi)^2)))})
+    return(dist.xi)
+  })
+  return(unlist(Dist.X))
+}
+
+dist.1 <- Dist(100, 2) 
+dist.2 <- Dist(100, 10)
+dist.3 <- Dist(100, 100)
+dist.4 <- Dist(100, 1000)
+
+p1 <- ggplot(data=data.frame(dist=dist.1)) + ggtitle('p=2') +
+  geom_histogram(aes(x=dist),color='black',fill='white', binwidth = 0.05) +
+  xlim(c(0,1.5))
+
+p2 <- ggplot(data=data.frame(dist=dist.2)) + ggtitle('p=10') +
+  geom_histogram(aes(x=dist),color='black',fill='white', binwidth = 0.05) + 
+  xlim(c(0,2.5))
+
+p3 <- ggplot(data=data.frame(dist=dist.3)) + ggtitle('p=100') +
+  geom_histogram(aes(x=dist),color='black',fill='white', binwidth = 0.05) +
+  xlim(c(0, 5.5))
+
+p4 <- ggplot(data=data.frame(dist=dist.4)) + ggtitle('p=1000') +
+  geom_histogram(aes(x=dist),color='black',fill='white', binwidth = 0.05) + 
+  xlim(c(0, 15))
+
+
+grid.arrange(p1, p2, p3, p4, nrow = 2)
+```
+
+
+It can be noticed from the histograms that when $p$ becomes larger, the average distance between two points also increases. Meanwhile, when $p$ is really large, the pairwise distances concentrate around a certian value and it will be hard to distinguish the nearest points or 'neighbors' given certian $x$. The 'local' prediction methods won't work well.
+
+# 1.7
+
+A lower bound for sample size $n$ is 
+$$n \geq (V_{p}(\varepsilon))^{-1} = \Big( \frac{1}{\pi \varepsilon^2}\Big)^{p/2} \Gamma(\frac{p}{2} + 1)$$
+When $p \rightarrow \infty$, since Giraud notes that $\frac { V _ { p } ( r ) } { \left( \frac { 2 \pi e r ^ { 2 } } { p } \right) ^ { p / 2 } ( p \pi ) ^ { - 1 / 2 } } \rightarrow 1$, an approximate lower bound for $n$ is 
+$$ n \geq \Big( \frac{p}{2 \pi e \varepsilon^2}\Big)^{p/2} (p \pi)^{1/2}$$
+Plug in $p = 20, 50, 200$ and $\varepsilon = 1, 0.1, 0.01$, we have 
+
+```{r, include=TRUE, echo=FALSE}
+LB.size <- function(p, eps){
+  if (p <= 500){
+    n <- gamma(p/2 + 1) / ((pi * eps^2)^(p/2)) 
+  }else{
+    n <- (p/(2*exp(1)))^(p/2) * sqrt(p * pi) / ((pi * eps^2)^(p/2)) 
+  }
+  return(n)
+}
+
+size <- matrix(NA, 3, 3)
+row.names(size) <- c(20, 50, 200)
+colnames(size) <- c(1, 0.1, 0.01)
+P <- c(20,50,200)
+Eps <- c(1, 0.1, 0.01)
+for (ind.p in 1:3){
+  for (ind.eps in 1:3){
+    size[ind.p, ind.eps] <- LB.size(p = P[ind.p], eps = Eps[ind.eps])
+  }
+}
+size
+```
+
+# 2.2
+
+Proof: $$L ( y , \hat { y } ) = \left[ \ln \left( \frac { \hat { y } + 1 } { y + 1 } \right) \right] ^ { 2 }$$. To find the optimal predictor, note that
+\begin{align*}
+E \Big[ \Big( \ln \left(\frac{a+1}{y+1}\right)\Big)^{2}\Big|x\Big]  
+     &=  E \Big[ \left\{ \ln(y+1) - E[\ln(y+1)|x] \right\}^2 + \left\{ E[\ln(y+1)|x] - \ln(a+1)\right\}^2 \Big|x\Big] \\
+     &=  Var (\ln(y+1)|x) + \left\{ E[\ln(y+1)|x] - \ln(a+1)\right\}^2 
+\end{align*}
+
+Therefore, the optimal predictor $f(x)$ satisfies that 
+$$ \ln(f(x)+1) = E[\ln(y+1)|x]$$, which leads to 
+$$f(x) = \exp \left\{E[\ln(y+1)|x]\right\} -1$$
+
+# 2.3
+
+
+## (i). $h _ { 1 } ( v ) = \ln ( 1 + \exp ( - v ) ) / \ln ( 2 )$.
+\begin{align*}
+\because g_{1}(\mathbf{x}) &= \arg\min_{g} E \Big[h_{1} ( y g)\Big|\mathbf{x}\Big] = \arg\min_{g}  E \Big[ \ln(1+\exp(-yg))\Big|\mathbf{x}\Big] \\
+ &= \arg\min_{g} \Big\{  P(y=1|\mathbf{x}) \ln(1+exp(-g)) + P(y=-1|\mathbf{x}) \ln(1+exp(g))\Big\} =\arg\min_{g} R(g) 
+\end{align*}
+Let $c = P(y=1|\mathbf{x})$, then solve equation
+$$\frac{\partial R(g)}{\partial g} = \frac{\exp(g)}{1+\exp(g)} - c =0 $$ we have $$g_{1}(\mathbf{x}) = \ln\Big(\frac{c}{1-c}\Big) = \ln \Big( \frac{P(y=1|\mathbf{x})}{P(y=-1|\mathbf{x})}\Big).$$
+And $\frac{\partial^2 R(g)}{\partial g^2}\Big|_{g=g_1} = \frac{\exp(g)}{(1+\exp(g))^2}\Big|_{g=g_1} >0$. Therefore, the optimizer of $E\Big[ h_{1}(yg(\mathbf{x}))\Big]$ is 
+$$g_{1}(\mathbf{x}) =  \ln \Big( \frac{P(y=1|\mathbf{x})}{P(y=-1|\mathbf{x})}\Big).$$
+
+## (ii). $h _ { 2 } ( v ) = \exp ( - v )$.
+
+Similarly, to find optimizer of $E\Big[ h_{2}(yg(\mathbf{x}))\Big]$, i.e.
+$$
+g_{2}(\mathbf{x}) =  \arg\min_{g} E \Big[h_{2} ( y g)\Big|\mathbf{x}\Big] =  \arg\min_{g} \Big\{  P(y=1|\mathbf{x}) \exp(-g) +  \exp(g)\Big\} =  \arg\min_{g} R(g).
+$$
+
+Then let $c = P(y=1|\mathbf{x})$, solve equation $$\frac{\partial R(g)}{\partial g} = (1-c) \exp(g) - c \exp(-g) = 0, $$
+we have $$g_2(\mathbf{x}) = \frac{1}{2} \ln \Big( \frac{P(y=1|\mathbf{x})}{P(y=-1|\mathbf{x})}\Big). $$
+Meanwhile, $\frac{\partial^2 R(g)}{\partial g^2}\Big|_{g=g_{2}} >0$. Hence, 
+$g_2(\mathbf{x}) = \frac{1}{2} \ln \Big( \frac{P(y=1|\mathbf{x})}{P(y=-1|\mathbf{x})}\Big)$ is an optimizer for $E\Big[ h_{2}(yg(\mathbf{x}))\Big]$.
+
+
+## (iii). $h_{ 3 } ( v ) = (1-v)_{ + }$.
+
+\begin{align*}
+g_{3}(\mathbf{x}) &= \arg\min_{g} E\Big[ h_{3}(yg)\Big|\mathbf{x}\Big] =   \arg\min_{g} E\Big[ (1-yg)_{ + }\Big|\mathbf{x}\Big] \\ 
+&=  \arg\min_{g} \Big\{ P(y=1|\mathbf{x}) (1-g)_{+} + P(y=-1|\mathbf{x} (1+g)_{+})\Big\} \\
+&= \arg\min_{g} \Big\{P(y=1|\mathbf{x}) (1-g) I_{\{g \leq 1\}} + P(y=-1|\mathbf{x})(1+g)I_{\{g \geq -1\}} \Big\}
+\end{align*}
+
+If $P(y=1|\mathbf{x}) < \frac{1}{2}$, $g_{3}(\mathbf{x}) = -1$. Otherwise when $P(y=1|\mathbf{x}) > \frac{1}{2}$, we have optimizer $g_{3}(\mathbf{x}) = 1$. Hence,  an optimizer for $E\Big[ h_{3}(yg(\mathbf{x}))\Big]$ is $$g_{3}(\mathbf{x}) = \text{sign}\Big\{P(y=1|\mathbf{x}) - P(y=-1|\mathbf{x}) \Big\}.$$
+
+
+# 2.4
+
+Similar as the loss function $h_{3}$ we considered in Question 2.3, given loss function $L ( y , \hat { y } ) = ( 1 - y \hat { y } ) _ { + }$ and suppose that $P [ y = 1 ] = p$, we have
+
+$$E\Big[ L ( y , \hat { y } ) \Big] = p ( 1 - \hat { y } ) _ { + } + (1-p) ( 1 + \hat { y } ) _ { + } = p ( 1 - \hat { y } ) I_{\{\hat{y} \leq 1\}} + (1-p) ( 1 + \hat { y } ) I_{\{\hat{y} \geq -1\}} $$
+
+```{r, echo=FALSE}
+xgrid <- seq(-3,3,0.001)
+Risk.p <- function(p, x){
+  r <- p * (1-x) * as.numeric(x <= 1) + (1-p) * (1+x)*as.numeric(x >= -1)
+  return(r)
+}
+
+R_0.3 <- Risk.p(0.3, xgrid)
+R_0.65 <- Risk.p(0.65, xgrid)
+
+p5 <- ggplot() + geom_line(aes(x=xgrid, y=R_0.3)) + ggtitle('p < 0.5 (p=0.3)') +
+  ylim(c(0,4)) + ylab('Expected Loss') + xlab('yhat')
+
+p6 <- ggplot() + geom_line(aes(x=xgrid, y=R_0.65)) + ggtitle('p > 0.5 (p=0.65)') +
+  ylim(c(0,4)) + ylab('Expected Loss') + xlab('yhat')
+```
+
+```{r, echo=FALSE, fig.height=4}
+grid.arrange(p5, p6, nrow=1)
+```
+
+Hence, the optimal choice of $\hat{y}$ is 
+$$\hat{y} = \text{sign} \Big\{p - \frac{1}{2}\Big\} = \text{sign} \Big\{P(y=1|\mathbf{x}) - P(y=-1|\mathbf{x})\Big\}$$
+
+
+# 2.5
+Consider $\pi_{0} = \pi_{1} = \frac{1}{2}$ and $g ( x | 0 ) = I [ - 0.5 < x < 0.5 ],\ g ( x | 1 ) = 12 x ^ { 2 } I [ - 0.5 < x < 0.5 ]$.
+
+## (a). 
+
+Given $0-1$ loss $L (y, f(x)) = I_{\{y \neq f(x)\}}$, the optimal classification rule is 
+
+\begin{align*}
+f(x) &= \arg\min_{a} E\Big[ I_{\{y \neq a\}} \Big| x \Big] = \arg\min_{a} \Big\{P(y=1|x) I_{\{a=0\}} + P(y=0|x) I_{\{a=1\}}  \Big\} \\
+&= I_{\{P(y=1|x) > P(y=0|x)\}}
+\end{align*}
+
+$$\because P(y=1|x) = \frac{g(x|1) \pi_{1}}{g(x|0) \pi_{0} + g(x|1) \pi_{1}} = \frac{12 x^2}{12 x^2 + 1} I_{\{-0.5 < x < 0.5\}}$$
+
+$$\therefore f(x) =I_{\{P(y=1|x) > P(y=0|x)\}} = I_{\{\frac{12 x^2}{12 x^2 + 1} > \frac{1}{2}\}}  I_{\{-0.5 < x < 0.5\}} = I_{\{\frac{1}{12} < x^2 < \frac{1}{4}\}}$$
+
+The minimum expected loss is 
+\begin{align*}
+E \Big[ I_{\{y \neq f(x)\}} \Big] &= P(y=1, f(x)=0) + P(y=0, f(x)=1) = \pi_{1} P(f(x)=0|y=1) + \pi_{0} P(f(x)=1|y=0)\\
+&=\frac{1}{2} P\Big(x^2 < \frac{1}{12}\Big|y=1\Big) + \frac{1}{2} P\Big(\frac{1}{12} <x^2 < \frac{1}{4}\Big|y=0\Big) =  \frac{9-2\sqrt{3}}{18}.
+\end{align*}
+
+
+## (b).
+
+$t(x) = x^2$ would be a good choice. Because in (a) we have shown that the  ratio of $\frac{P(y=1|x)}{P(y=0|x)} \propto x^2$ and the optimal classifier $I_{\{\frac{1}{12} < x^2 < \frac{1}{4}\}}$ is also closely related to $x^2$.   
+
+# 3.3
+## (a)
+$$
+\begin{aligned}
+\because \ E(y-f(x))^2 &= E[E\{(y-f(x))^2|x\}] \\
+& = E[E\{y^2-2yf(x)+f^2(x)|x\}] \\
+& = E[f^2(x)-2f(x)E(y|x)+E(y^2|x)] \\
+& = E[f^2(x)-2f(x)\sin(x) + \sin^2(x)+\frac{1}{4}(|x|+1)^2] \\
+& = E[(f(x)-\sin(x))^2 +\frac{1}{4}(|x|+1)^2] \\
+& \ge  E[\frac{1}{4}(|x|+1)^2] \\
+\end{aligned}
+$$
+$$
+\begin{aligned}
+\therefore \min_{f} \{E(y-f(x))^2\} & =  E[\frac{1}{4}(|x|+1)^2] \\
+& = \frac{1}{2\pi}\int_{-\pi}^{\pi} \frac{1}{4}(|x|+1)^2 dx \\
+& = \frac{1}{4}(1 + \pi + \frac{1}{3}\pi^2) \\
+\end{aligned}
+$$
+
+
+
+$$ \therefore \ f^*(x)  =  \mathrm{argmin}_{f} \{E(y-f(x))^2\}  = \sin(x) $$
+
+## (b)
+
+For linear predictor, define:
+
+$$
+  l_1 = E(\sin(x)-g_1(x))^2 = E(\sin(x)-a - bx)^2
+$$
+
+Solve:
+$$
+\left\{                         
+\begin{aligned}
+\frac{\partial l_1}{\partial a} &= -E(\sin(x)-a-bx) = 0\\
+\frac{\partial l_1}{\partial b} &= -E[x(\sin(x)-a-bx)] = 0\\
+\end{aligned}
+\right.
+$$
+
+then:
+$$
+\left\{                         
+\begin{aligned}
+\hat{a} &=  0\\
+\hat{b} &= \frac{Ex\sin(x)}{Ex^2} = \frac{3}{\pi^2}\\
+\end{aligned}
+\right.
+$$
+
+Thus,
+$$
+g_1^*(x)=\frac{3x}{\pi^2}
+$$
+
+
+Similarly, for cubic predictor, define:
+
+$$
+  l_3 = E(\sin(x)-g_3(x))^2 = E(\sin(x)-a - bx - cx^2 - dx^3)^2
+$$
+
+Solve:
+$$
+\left\{                         
+\begin{aligned}
+\frac{\partial l_3}{\partial a} &= -E(\sin(x)-a-bx-cx^2-dx^3) = 0\\
+\frac{\partial l_3}{\partial b} &=-E[x(\sin(x)-a-bx-cx^2-dx^3)] = 0\\
+\frac{\partial l_3}{\partial c} &= -E[x^2(\sin(x)-a-bx-cx^2-dx^3)] = 0\\
+\frac{\partial l_3}{\partial d} &=-E[x^3(\sin(x)-a-bx-cx^2-dx^3)] = 0\\
+\end{aligned}
+\right.
+$$
+
+Since: $E(\sin(x)) = E(x) = E(x^3) = E(x^5) = E(x^2\sin(x)) = 0$, $E(x^2) = \frac{\pi^2}{3}$, $E(x^4) = \frac{\pi^4}{5}$, $E(x^6) = \frac{\pi^6}{7}$, $E(x\sin(x))=1$, $E(x^3\sin(x))=\pi^2 - 6$.
+
+Therefore, the above equation system is equivalent to:
+$$
+\left\{                         
+\begin{aligned}
+a + \frac{\pi^2}{3} c &= 0 \\
+\frac{\pi^2}{3}b + \frac{\pi^4}{5} d &= 1 \\
+\frac{\pi^2}{3}a + \frac{\pi^4}{5} c &= 0 \\
+\frac{\pi^4}{5}b + \frac{\pi^6}{7} d &= \pi^2 - 6 \\
+\end{aligned}
+\right.
+$$
+
+and:
+$$
+\left\{                         
+\begin{aligned}
+\hat{a} &=  0\\
+\hat{b} &=  \frac{15(21-\pi^2)}{2\pi^4}\\
+\hat{c} &=  0\\
+\hat{d} &=  -\frac{35(15-\pi^2)}{2\pi^6}\\
+\end{aligned}
+\right.
+$$
+
+
+
+Thus,
+$$
+g_3^*(x)=\frac{15(21-\pi^2)}{2\pi^4}x -  \frac{35(15-\pi^2)}{2\pi^6} x^3
+$$
+
+Using cubic predictor cannot eliminate model bias since $\sin(x)$ does not belongs to the cubic functions group.
+
+# 3.4
+
+```{r   echo = FALSE}
+D3_4 <- read_excel(path="/Users/apple/Desktop/ISU 2019 spring/STAT 602/hw/hw1/Problem3.4Data.xlsx")
+D3_4 <- as.data.frame(D3_4)
+
+cv_10fd <- function(data,formula){
+  cv_score <- NULL
+  for (i in 1:10){
+    test_ind <- (1:10)+(i-1)*10
+    Train <- data[-test_ind,] 
+    Test <- data[test_ind,] 
+    fit <- lm(formula=formula,data=Train)
+    py <- predict(fit,newdata=data.frame(x=Test$x))
+    MSE <- mean(  (py - Test$y)^2  )
+    cv_score <- c(cv_score,MSE)
+  }
+  return(mean(cv_score))
+}
+```
+
+
+```{r}
+formula1.0 <- "y~ 1"
+cv_10fd(D3_4, formula1.0)
+
+formula1.1 <- "y~ x"
+cv_10fd(D3_4, formula1.1)
+
+formula1.2 <- "y~ x + I(x^2)"
+cv_10fd(D3_4, formula1.2)
+
+formula1.3 <- "y~ x + I(x^2) + I(x^3)"
+cv_10fd(D3_4, formula1.3)
+
+formula1.4 <- "y~ x + I(x^2) + I(x^3) + I(x^4)"
+cv_10fd(D3_4, formula1.4)
+
+formula1.5 <- "y~ x + I(x^2) + I(x^3) + I(x^4) + I(x^5)"
+cv_10fd(D3_4, formula1.5)
+
+formula2 <- "y~ sin(x) + cos(x)"
+cv_10fd(D3_4, formula2)
+
+formula3 <- "y~ sin(x) + cos(x) + sin(2*x) + cos(2*x)"
+cv_10fd(D3_4, formula3)
+
+formula4 <- "y~ x + I(x^2) + I(x^3) + I(x^4) + I(x^5) + sin(x) + cos(x) + sin(2*x) + cos(2*x)"
+cv_10fd(D3_4, formula4)
+
+
+```
+
+
+
+We can see from the R output that the basis: $\{1, \sin(x), \cos(x) \}$ has the best performance (say, the smallest CV scores) among all sets of basis. All basis that consist $\sin(x)$ do not have model bias.
+
+
+# 3.5
+
+## (a)
+
+See the result of Problem 2.5, the minimum expect loss is: $\frac{1}{2} - \frac{\sqrt{3}}{9}$, in this case, $f^*(x) = I(12x^2 \ge 1) = I(x \ge \frac{\sqrt{3}}{6} \ or \ x \le -\frac{\sqrt{3}}{6})$
+
+
+## (b)
+
+To minimize $E\{I(y \neq g_c(x))\}$, it's equivalent to maximize $E\{I(y = g_c(x))\}$,
+$$
+\begin{aligned}
+\because \ E\{I(y = g_c(x))\} & = P(y=g_c(x)) \\
+& = \frac{1}{2} P(g_c(x)=1|y=1) + \frac{1}{2} P(g_c(x)=0|y=0) \\
+& = \frac{1}{2} P(x\ge c|y=1) + \frac{1}{2} P(x<c|y=0) \\
+\end{aligned}
+$$
+
+
+$$
+\therefore \ E\{I(y = g_c(x))\} = 
+\left\{ 
+\begin{aligned}
+&\frac{1}{2}, & c \notin (-\frac{1}{2},\frac{1}{2}) \\
+& \frac{1}{2} \int_{c}^{1/2}12x^2dx + \frac{1}{2} \int_{-1/2}^{c}dx,    & c \in (-\frac{1}{2},\frac{1}{2}) \\
+\end{aligned}
+\right.
+$$
+
+It's easy to find $\hat{c}=\frac{\sqrt{3}}{6}$ that maximize $E\{I(y = g_c(x))\}$. Thus,
+$$g_{\hat{c}}(x)=I(x \ge \frac{\sqrt{3}}{6} )$$
+
+$$  E\{I(y \neq g_{\hat{c}}(x))\} = \frac{1}{2} - \frac{\sqrt{3}}{18}$$
+
+The model penalty is: 
+$$E\{I(y \neq g_{\hat{c}}(x))\} - E\{I(y \neq f^*(x)\} = \frac{\sqrt{3}}{18} $$
+
+
+## (c)
+
+In part (b),  we maximize:
+$$ E\{I(y = g_c(x))\} = P(y=1)P(x\ge c|y=1) + P(y=0) P(x<c|y=0) $$
+
+now $P(y=1)$, $P(y=0)$, $G(x<x_0|y=1)$, and $G(x<x_0|y=0)$ are unknown, we can estiamte them by:
+$$\hat{P}(y=0) = \hat{\pi}_0 = \frac{\sum_{i=1}^N I(y_i=0)}{N}; \ \ \ \  \hat{P}(y=1) = 1-\hat{\pi}_0$$
+
+$$ \hat{G}(x<x_0|y) = \frac { \# \text { training cases with } x _ { i } \leq x_0 \text { and } y _ { i } = y } { \# \text { training cases with } y _ { i } = y }$$
+
+
+Thus, we can estimate $E\{I(y = g_c(x))\}$ by:
+
+$$
+\hat{E}\{I(y = g_c(x))\} = (1 - \hat{\pi}_0) (1 - \hat{G}(c|1)) +  \hat{\pi}_0  \hat{G}(c|0)
+$$
+
+We can numerically find $\hat{c}$ that maximize $\hat{E}\{I(y = g_c(x))\}$.
+
+
+
+
+# 3.11
+
+## (a)
+
+$$
+\begin{aligned}
+P(y=1|x) &= \frac{ f(x|y=1)\pi_1 }{ f(x|y=0)\pi_0 + f(x|y=1)\pi_1 } \\
+&= \frac{ f(x|y=1) }{ f(x|y=0) + f(x|y=1) } \\
+&= \frac{ 2\exp\{-2(x-1)^2\} }{ \exp\{-x^2/2\} + 2\exp\{-2(x-1)^2\}  }
+\end{aligned}
+$$
+
+```{r  echo = FALSE}
+P1x <- function(x){
+  l1 <- dnorm(x,1,1/2)
+  l2 <- dnorm(x,0,1)
+  out <- l1/(l1+l2)
+  return(out)
+}
+
+
+x <- seq(-2,4,0.001)
+plot(x,P1x(x),type="l", ylab = "P(y=1|x)")
+abline(h=0.5,col="red")
+```
+
+
+
+
+## (b)
+
+Similar to Problem 2.5, the optimal classfier is:
+$$ 
+f^*(x) = I(P(y=1|x)>P(y=0|x)) = I(P(y=1|x)>\frac{1}{2})
+$$
+
+```{r}
+range( x[which( P1x(x)>0.5 )] )
+```
+
+By R output, we find that $f^*(x) = I(0.382<x<2.285)$
+
+In this case, the expected loss is:
+
+$$
+\begin{aligned}
+EI(y \neq f^*(x)) &= P(y \neq  f^*(x) ) \\
+& = \frac{1}{2} P(f^*(x)=1|0) + \frac{1}{2} P(f^*(x)=0|1) \\
+& = \frac{1}{2} P( 0.382<x<2.285 |0) + \frac{1}{2} P( x \ge2.285 \ or \ x \le 0.382 |1) \\
+\end{aligned}
+$$
+
+We can compute the result by R:
+
+```{r}
+R1 <- (1/2)*( pnorm(2.285,0,1)-pnorm(0.382,0,1) ) + 
+  (1/2)*( 1-pnorm(2.285,1,1/2) + pnorm(0.382,1,1/2) )
+R1
+```
+
+## (c)
+
+```{r,   echo = FALSE}
+Rlc <- function(a){
+  out <- (1/2)*pnorm(a,0,1) + (1/2)*(1-pnorm(a,1,0.5))
+  return(out)
+}
+
+Ruc <- function(a){
+  out <- (1/2)*(1-pnorm(a,0,1)) + (1/2)*pnorm(a,1,0.5)
+  return(out)
+}
+
+x <- seq(-2,8,0.001)
+D <- data.frame(x=rep(x,2), y=c(Rlc(x),Ruc(x)), 
+                label=rep(c("lc","uc"),each=length(x)))
+library(ggplot2)
+
+ggplot(data=D) + 
+  geom_line(aes(x=x,y=y,colour=label)) + 
+  scale_color_discrete(name="Classifers",
+                          breaks=c("lc", "uc"),
+                          labels=c("I( x < c )", "I( x > c )")) + 
+  ylab("Risk")+
+  theme_bw()
+
+```
+
+
+
+From the plot, it's easy to find that classifier $I(x>c)$ is prefered, we can find $\hat{c}$ by:
+
+```{r}
+x[which.min(Ruc(x))]
+```
+
+The expected loss is: 
+$$
+\begin{aligned}
+EI(y \neq I(x>0.381))) &= P(y \neq  I(x>0.381) ) \\
+& = \frac{1}{2} P( x > 0.381 |0) + \frac{1}{2} P(  x \le 0.381 |1) \\
+\end{aligned}
+$$
+
+
+We can compute the result by R:
+
+```{r}
+R2 <- (1/2)*( 1-pnorm(0.381,0,1) ) + 
+  (1/2)*(  pnorm(0.381,1,1/2) )
+R2
+```
+
+The modeling penalty is just:
+
+```{r}
+R2 - R1
+```
+
+
+## (d)
+```{r echo = FALSE}
+M <- 10000
+N1 <- 100
+N2 <-50
+
+
+
+simu_xy <- function(N){
+  y <- rbinom(N,1,1/2)
+  x0 <- rnorm(N,0,1)
+  x1 <- rnorm(N,1,1/2)
+  x <- x0*(1-y) + x1*y
+  out <- data.frame(x=x,y=y)
+  return(out)
+}
+
+
+Rlc1 <- function(a,x,y){
+  I1 <- (y==0)&(x<a)
+  I2 <- (y==1)&(x>a)
+  out <- sum(I1)+sum(I2)
+  return(out)
+}
+
+Ruc1 <- function(a,x,y){
+  I1 <- (y==0)&(x>a)
+  I2 <- (y==1)&(x<a)
+  out <- sum(I1)+sum(I2)
+  return(out)
+}
+
+
+classifier_3_11d <- function(M,N){
+  C <- NULL
+  Model_ind <- NULL
+  
+  for (i in 1:M){
+    D <- simu_xy(N)
+    a0 <- sort(D$x)
+    Sl <- lapply(X=a0, FUN=Rlc1, x=D$x, y=D$y)
+    Su <- lapply(X=a0, FUN=Ruc1, x=D$x, y=D$y)
+    Sl <- unlist(Sl)
+    Su <- unlist(Su)
+    min_num <- min(Sl,Su)
+    min_ind <- which(pmin(Sl,Su)==min_num)
+    a1 <- mean(a0[min_ind])
+    model_ind <- as.numeric(  ( Rlc1(a1,D$x,D$y) < Ruc1(a1,D$x,D$y) ) )
+    C <- c(C,a1)
+    Model_ind <- c(Model_ind,model_ind)
+  } 
+  
+  Con_err <- NULL
+  for (i in 1:M){
+    if (Model_ind[i]==0){
+      cerr <- (1/2)*( 1-pnorm(C[i],0,1) ) + 
+        (1/2)*(  pnorm(C[i],1,1/2) )
+    }
+    if (Model_ind[i]==1){
+      cerr <- (1/2)*( pnorm(C[i],0,1) ) + 
+        (1/2)*(  1-pnorm(C[i],1,1/2) )
+    }
+    Con_err <- c(Con_err,cerr)
+  }
+  out <- list(C=C, Model_ind=Model_ind, 
+              Con_err=Con_err)
+  return(out)
+}
+
+```
+
+
+
+For $N=100$ case, the mean of estimated $\hat{c}$, the frequency of the classifier with the form $I(x<c)$, the mean of the conditonal error rate for the 10000 training samples are given in the following R output, the fitting penalty are also computed:
+
+```{r, cache = TRUE}
+## N=100
+Out100 <- classifier_3_11d(M,N1)
+
+## mean c_hat
+mean(Out100$C)
+## model frequency
+mean(Out100$Model_ind)
+## Risk for N=100
+R3_100 <- mean(Out100$Con_err)
+R3_100 
+## fitting penalty
+R3_100 - R2
+
+```
+
+
+We computed the same statistics for $N=50$ case:
+
+```{r, cache = TRUE}
+## N=50
+Out50 <- classifier_3_11d(M,N2)
+## mean c_hat
+mean(Out50$C)
+## model frequency
+mean(Out50$Model_ind)
+## Risk for N=100
+R3_50 <- mean(Out50$Con_err)
+R3_50 
+## fitting penalty
+R3_50 - R2
+```
+
+Thus, the fitting penalty indeed increases when $N$ decreases from 100 to 50.
+
+# 3.12
+
+## (a)
+
+By problem 2.3:
+
+$$
+\begin{aligned}
+g^*(x) &= \frac{1}{2} \log\frac{P(y=1|x)}{P(y=-1|x)} \\
+&=  \frac{1}{2} \log\frac{f(x|y=1)}{f(x|y=0)} \\
+& = \frac{1}{2} \log \frac{2 e^{-2(x-1)^2}}{e^{-x^2/2}} \\
+& = -\frac{3}{4}x^2 + 2x -1 + \frac{1}{2}\log2
+\end{aligned}
+$$
+
+The plot of $g^*(x)$ is given below:
+
+
+```{r  echo = FALSE}
+g <- function(x){
+  out <- -(3/4)*x^2 + 2*x - 1 + (1/2)*log(2)
+  return(out)
+}
+
+x <- seq(-1,3.5,0.001)
+plot(x,g(x),type="l")
+```
+
+
+
+## (b)
+```{r, echo = FALSE}
+# b
+D3_12 <- read.table(file="/Users/apple/Desktop/ISU 2019 spring/STAT 602/hw/hw1/Problem3.12.txt",
+                    header=TRUE, sep=",")
+D3_12$y[which(D3_12$y==0)] <- -1
+
+Risk <- function(b,x,y){
+  x1 <- x - mean(x)
+  out <- mean( exp(-y*(b[1] + b[2]*x1 + b[3]*x1^2)) )
+  return(out)
+}
+
+```
+
+Using R function "nlm":
+
+
+```{r}
+fit2 <- nlm(f=Risk,p=c(0,0,0),x=D3_12$x, y=D3_12$y)
+fit2$estimate
+```
+
+
+```{r,  echo = FALSE}
+f <- function(x,b,mu){
+  out <- b[1] + b[2]*(x-mu) + b[3]*(x-mu)^2
+  return(out)
+}
+```
+
+
+## (c)
+Using "nlm" for $\lambda \in \{1, 0.1, 0.01, 0.001\}$:
+
+```{r  echo = FALSE}
+PRisk <- function(b,x,y,lambda){
+  x1 <- x - mean(x)
+  out <- mean( exp(-y*(b[1] + b[2]*x1 + b[3]*x1^2)) ) + lambda*b[3]^2
+  return(out)
+}
+```
+
+```{r}
+fit3_0 <- nlm(f=PRisk,p=c(0,0,0),x=D3_12$x, y=D3_12$y,lambda=1)
+fit3_0$estimate
+fit3_1 <- nlm(f=PRisk,p=c(0,0,0),x=D3_12$x, y=D3_12$y,lambda=0.1)
+fit3_1$estimate
+fit3_2 <- nlm(f=PRisk,p=c(0,0,0),x=D3_12$x, y=D3_12$y,lambda=0.01)
+fit3_2$estimate
+fit3_3 <- nlm(f=PRisk,p=c(0,0,0),x=D3_12$x, y=D3_12$y,lambda=0.001)
+fit3_3$estimate
+
+```
+
+
+The plot is given below:
+
+
+
+```{r  echo = FALSE}
+x <- seq(-3,5,0.1)
+y2 <- f(x,b=fit2$estimate,mu=mean(D3_12$x))
+y3_0 <- f(x,b=fit3_0$estimate,mu=mean(D3_12$x))
+y3_1 <- f(x,b=fit3_1$estimate,mu=mean(D3_12$x))
+y3_2 <- f(x,b=fit3_2$estimate,mu=mean(D3_12$x))
+y3_3 <- f(x,b=fit3_3$estimate,mu=mean(D3_12$x))
+
+output3_12 <- data.frame(x=rep(x,6), y=c(g(x),y2,y3_0,y3_1,y3_2,y3_3),
+                         label=rep(c("y1","y2","y3_0","y3_1","y3_2","y3_3"), each=length(x))
+                         )
+
+
+ggplot(data=output3_12) + 
+  geom_line(aes(x=x, y=y, colour=label)) + 
+  scale_color_discrete(name="Classifers",
+                       breaks=c("y1","y2","y3_0","y3_1","y3_2","y3_3"),
+                       labels=c("Theoretical", "Un-penalized",
+                                "Penalized(1)", "Penalized(0.1)",
+                                "Penalized(0.01)","Penalized(0.001)")) + 
+  theme_bw()
+
+```
+
+
+
+
+# 5.7
+
+First of all, it's easy to find that $\{1,t,\cos(t)\}$ are pairwise perpendicular, since $<1,t>=0$, $<1,\cos(t)>=0$, $<t,\cos(t)>=0$. Also note that $<1,1>=2\pi$, $<t,t>=\frac{2\pi^3}{3}$, $<\cos(t),\cos(t)>=\pi$, thus: $q_1 = \frac{1}{\sqrt{2\pi}}$, $q_2 = t/\sqrt{\frac{2\pi^3}{3}}$, $q_3 = \cos(t)/\sqrt{\pi}$.
+
+On the other hand, since $<1,\sin(t)>=0$, $<t,\sin(t)>=2\pi$, $<\sin(t),\cos(t)>=0$, hence:
+
+$$z_4 = \sin(x) - \frac{<t,\sin(t)>}{<t,t>}t =  \sin(x) - \frac{3t}{\pi^2}$$
+
+Finally, given that:
+$$<z_4,z_4>=\int_{-\pi}^{\pi}(\sin(x) - \frac{3t}{\pi^2})^2 dt = \pi - \frac{6}{\pi}$$
+
+we have: $q_4 = (\sin(x) - \frac{3t}{\pi^2})/\sqrt{\pi - \frac{6}{\pi}}$. Thus, one of the 4-dimensional orthonormal basis is: 
+$$ \{  1/\sqrt{2\pi}, \ \   t/\sqrt{\frac{2\pi^3}{3}}, \ \  \cos(t)/\sqrt{\pi}, \ \  (\sin(x) - \frac{3t}{\pi^2})/\sqrt{\pi - \frac{6}{\pi}} \} $$
+
+
+
+
+
