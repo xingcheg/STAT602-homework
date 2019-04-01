@@ -1,0 +1,1136 @@
+---
+title: "Homework 2"
+author: "Xingche Guo and Yueying Wang"
+date: "3/3/2019"
+output: pdf_document
+---
+
+```{r  echo = FALSE, message=FALSE}
+library(readxl)
+library(caret)
+library(ggplot2)
+library(reshape2)
+library(gridExtra)
+library(glmnet)
+library(GGally)
+```
+
+
+# Problem 1
+
+## 4.3
+
+```{r, cache = TRUE, warning=FALSE}
+Housing_data <- read_xlsx('/Users/apple/Desktop/ISU 2019 spring/STAT 602/hw/hw2/AmesHousingData.xlsx', 
+                          col_names  = TRUE)
+
+Y <- Housing_data[,'Price']
+X <- Housing_data[,c('Size','Fireplace','Bsmt Bath','Land')]
+n <- nrow(X)
+CV_int <- train(y=Y$Price,x=data.frame(int=rep(1,n)),method="lm",
+               trControl=trainControl(method="repeatedcv",repeats=100,number=8))
+
+input <- list(1,2,3,4,c(1,2),c(1,3),c(1,4),c(2,3),c(2,4),c(3,4),
+              c(1,2,3),c(1,2,4),c(1,3,4),c(2,3,4),c(1,2,3,4))
+RMSPE <- lapply(input, FUN = function(var_ind){
+  CV_tmp <- train(y=Y$Price, x=X[,var_ind], method='lm',
+                  trControl=trainControl(method="repeatedcv",repeats=100,number=8))
+  return(CV_tmp$results$RMSE)
+})
+
+Var_names <- sapply(input, FUN = function(var_ind){
+  return(paste(colnames(X)[var_ind], collapse=','))
+})
+names(RMSPE) <- unlist(Var_names)
+```
+It seems that the model with all four variables has the smallest RMSPE.
+
+```{r}
+RMSPE
+```
+
+
+## 4.4
+
+### (a).
+
+```{r,  cache = TRUE}
+glass <- read.table(file = "/Users/apple/Desktop/ISU 2019 spring/STAT 602/hw/hw2/glass.data.txt",
+                    sep = ",")
+names(glass) <- c("ID", "RI", "Na", "Mg", "Al", "Si", 
+                  "K", "Ca", "Ba", "Fe", "Type")
+glass1 <- glass[ (glass$Type==1) | (glass$Type==2)  ,-1]
+glass1$Type <- as.factor( glass1$Type )
+
+
+# define training control
+train_control <- trainControl(method="repeatedcv", number=10, repeats = 50)
+
+# find best n (in KNN)
+grid = expand.grid(k = (2*(1:12)-1) )
+
+train_knn <- train(Type~., data=glass1, trControl=train_control, method="knn",
+                   preProcess = c("center", "scale"),
+                   tuneGrid = grid)
+
+
+train_knn$results
+plot(train_knn)
+```
+
+
+### (b).
+
+There is no need to make any modification. The frequency of $\text{Type}=2$ in the training set is $\pi^{*} = 76/146$ while the real value is $\pi = 0.3$. So according to section 1.5.1, to better account for the difference between $\pi^{*}$ and $\pi$, the modification of the classification rule is to classify the case to Type 2 if
+\[
+t(x)(1-\pi^{*})\pi > (k - t(x)) \pi^{*}(1-\pi).
+\]
+When $k = 1$, the modified rule is to classify it to glass Type 2 if
+\[
+\Rightarrow t(x) > 0.7170.
+\]
+
+Because $t(x) = 0 \ \text{or}\ 1$, it makes no difference whether we use $t(x) > \frac{k}{2} = \frac{1}{2}$ or $t(x) > 0.7170$ for classification. 
+
+
+##  5.1
+
+### (a)
+```{r}
+
+X <- matrix(c(2, 4, 7, 2,
+              4, 3, 5, 5,
+              3, 4, 6, 1,
+              5, 2, 4, 2,
+              1, 3, 4, 4), ncol = 4, nrow = 5, byrow = TRUE)
+
+
+# QR Decomposition
+qr_fit <- qr(X)
+Q <- qr.Q(qr_fit)     # Basis for C(X)
+Q
+R <- qr.R(qr_fit)
+R
+# Q %*% R 
+
+# Singular Value Decomposition
+svd_fit <- svd(X)
+U <- svd_fit$u       # Basis for C(X) 
+U
+V <- svd_fit$v
+V
+D <- diag(svd_fit$d)
+D
+# U %*% D %*% t(V)
+
+
+```
+
+
+### (b)
+```{r}
+eigen(t(X)%*%X)
+eigen(X%*%t(X))
+
+```
+
+The eigenvectors of $X'X$ is $V$, the eigenvalues of $X'X$ is the square of the singular values of $X$; The first four eigenvectors of $XX'$ is $U$, the first four eigenvalues of $XX'$ is the square of the singular values of $X$, the last eigenvalue is 0.
+
+
+
+### (c)
+```{r}
+rank_approx <- function(X, r){
+  svd_fit.tmp <- svd(X)
+  Ur <- matrix(svd_fit.tmp$u[,1:r], ncol = r)
+  Vr <- matrix(svd_fit.tmp$v[,1:r], ncol = r)
+  Dr <- diag(svd_fit.tmp$d[1:r], ncol = r) 
+  Xr <- Ur %*% Dr %*% t(Vr)
+  return(Xr)
+}
+
+rank_approx(X, r=1)
+rank_approx(X, r=2)
+```
+
+
+### (d)
+```{r}
+X1 <- apply(X, 2, FUN=function(x){
+  return(x - mean(x))
+})
+
+# X1 <- scale(X, center = TRUE, scale = FALSE)
+
+
+svd_fit1 <- svd(X1)
+U1 <- svd_fit1$u
+D1 <- diag(svd_fit1$d)
+V1 <- svd_fit1$v    # V1's Columns are the Principal Components Directions
+U1 %*% D1    # Columns of U1D1 are the Principal Components 
+# First column of V1 is the loadings for the 1st principal component
+```
+
+
+### (e)
+```{r}
+rank_approx(X1, r=1)
+rank_approx(X1, r=2)
+```
+
+
+### (f)
+```{r}
+cov_X1 <- t(X1) %*% X1 / 5
+# eigenvectors same as columns of V1
+# eigenvalues are diag(D1^2/5)   merely the same as eigen(cov_X1), only sign difference
+
+V1
+diag(D1^2/5)
+eigen(cov_X1)
+
+rank_approx(cov_X1, r=1)
+rank_approx(cov_X1, r=2)
+```
+
+### re-do (d), (e), (f) for standardized X
+
+```{r}
+X2 <- apply(X1, 2, FUN = function(x){
+  return(x/sqrt(sum(x^2)/length(x)))
+})
+
+# (d) standardized
+
+svd_fit2 <- svd(X2)
+U2 <- svd_fit2$u
+D2 <- diag(svd_fit2$d)
+V2 <- svd_fit2$v    # V2's Columns are the Principal Components Directions
+U2 %*% D2    # Columns of U2D2 are the Principal Components 
+# First column of V2 is the loadings for the 1st principal component
+
+# (e) standardized
+
+rank_approx(X2, r=1)
+rank_approx(X2, r=2)
+
+# (f) standardized
+
+cov_X2 <- t(X2) %*% X2 / 5
+
+# eigenvectors same as columns of V2
+# eigenvalues are diag(D2^2/5)   merely the same as eigen(cov_X2), only sign difference
+
+V2
+diag(D2^2/5)
+eigen(cov_X2)
+
+rank_approx(cov_X2, r=1)
+rank_approx(cov_X2, r=2)
+```
+
+
+
+In the following Questions 2 and 3, the Harr wavelet basis and natural cubic spline basis is defined on $(0,1]$. So we transform the variable $x$ in the given data to lie within $(0,1]$, do the prediction and then transform it back to get all the
+plots. 
+
+
+# Problem 2
+
+
+```{r}
+
+Q2data <- read_xlsx('/Users/apple/Desktop/ISU 2019 spring/STAT 602/hw/hw1/Problem3.4Data.xlsx',col_names = TRUE)
+
+# Make Harr basis functions
+
+# Father wavelet
+Harr.F <- function(x){
+  y <- (x > 0) & (x <= 1)
+  return(as.numeric(y))
+}
+
+# Mother wavelet
+Harr.M <- function(x){
+  y = Harr.F(2*x) - Harr.F(2*x - 1)
+  return(y)
+}
+
+# other wavelets
+Harr.basis <- function(M, x){  # x: vector of locations to evaluate basis functions
+  B <- cbind(Harr.F(x),Harr.M(x))
+  for (m in 1:M){
+    for (j in 0:(2^m-1)){
+      psi_mj <- sqrt(2^m) * Harr.M(2^m * (x - j/(2^m)))
+      B <- cbind(B, psi_mj)
+    }
+  }
+  colnames(B) <- NULL
+  return(B)
+}
+
+
+# Normalize x to [0,1]
+x.01 <- (Q2data$x - min(Q2data$x) + 0.0001)/(max(Q2data$x) - min(Q2data$x) + 0.0001)
+
+# compute Xh
+Xh <- Harr.basis(M = 3, x = x.01)
+
+
+```
+
+### (a)
+
+```{r}
+# compute beta_ols 
+Y <- Q2data$y
+beta.ols <- solve(t(Xh)%*%Xh, t(Xh)%*%Y)
+# compute yhat_ols
+Yhat.ols <- Xh %*% beta.ols
+
+# plot
+x.grid <- seq(0.001,1,0.001)
+Xh.full <- Harr.basis(M = 3, x = x.grid)
+func.ols <- Xh.full %*% beta.ols
+Est.ols <- data.frame(x=x.01, y = Y, yhat.ols = Yhat.ols)
+ggplot() + geom_point(aes(x = Est.ols$x, y = Est.ols$y, color = 'y'),size = 0.5) +
+  geom_line(aes(x = x.grid, y = func.ols, color = 'yhat(OLS)'))
+```
+
+
+### (b)
+```{r}
+# Center y and standardize the columns of Xh
+Y.center <- Y - mean(Y)
+
+std_X <- function(X){
+  centers <- apply(X, 2, mean)
+  scales <- apply(X, 2, FUN = function(x){
+    x.center <- x - mean(x)
+    return(sqrt(sum(x.center^2)/length(x)))
+  })
+  X.std <- sapply(1:ncol(X), FUN = function(i){
+    x <- X[,i]
+    x.std <- (x - (centers[i]))/scales[i]
+    return(x.std)
+  })
+  return(list(X.std = X.std, centers = centers, scales = scales))
+}
+
+Xh.stdout <- std_X(Xh[,-1])    # no intercept
+Xh.std <- Xh.stdout$X.std
+
+
+
+# cross-validation to find lambda (that satisfies nzero M = 2, 4, 8)
+lambda.grid <- seq(0.0001,1,0.0001)
+cv.lasso <- cv.glmnet(x = Xh.std, y = Y.center, alpha = 1, lambda = seq(0,0.6,0.0001))
+lambda.grid <- cv.lasso$lambda
+nzero <- cv.lasso$nzero  
+ggplot() + geom_point(aes(x = lambda.grid, y = nzero),size = 0.1)
+Lam.n2 <- min(lambda.grid[nzero==1])    # smallest lambda with 2 nonzero beta entries
+Lam.n2
+Lam.n4 <- min(lambda.grid[nzero==3])    # smallest lambda with 4 nonzero beta entries
+Lam.n4
+Lam.n8 <- min(lambda.grid[nzero==7])    # smallest lambda with 8 nonzero beta entries
+Lam.n8
+
+
+# lasso fit for certain lambdas
+lasso.fit <- glmnet(x = Xh.std, y = Y.center, alpha = 1, lambda = c(Lam.n2, Lam.n4, Lam.n8))
+
+# estimated parameters beta_lasso
+param <- rbind(lasso.fit$a0,lasso.fit$beta)
+colnames(param) <- c('2 nonzero entries', '4 nonzero entries', '8 nonzero entries')
+param    
+
+# yhat_lasso
+lasso.pred <- predict(lasso.fit , s = c(Lam.n2, Lam.n4, Lam.n8), newx = Xh.std)
+
+
+# plot
+Est <- data.frame(cbind(Est.ols, lasso.pred))
+colnames(Est) <- c('x','y','yhat.ols','yhat.nzero2','yhat.nzero4','yhat.nzero8')
+
+x.grid <- seq(0.001,1,0.001)
+B.x <- Harr.basis(M=3, x.grid)[,-1]
+B.x.trans <- sapply(1:ncol(B.x), FUN = function(i){ # center B.x using centers and scales from Xh
+  x.tmp <- B.x[,i]
+  scale.tmp <- Xh.stdout$scales[i]
+  center.tmp <- Xh.stdout$centers[i]
+  return((x.tmp - center.tmp)/scale.tmp)
+})
+
+func.lasso <- predict(lasso.fit , s = c(Lam.n2, Lam.n4, Lam.n8), newx = B.x.trans)
+
+ggplot() + geom_point(aes(x = Est$x, y = Est$y, color = 'y'), size = 0.5) + 
+  geom_line(aes(x = x.grid, y = func.ols, color = 'yhat(OLS in (a))'), size = 0.5) + 
+  geom_line(aes(x = x.grid, y = func.lasso[,1], color = 'yhat(2 nonzero)'), size = 0.5) + 
+  geom_line(aes(x = x.grid, y = func.lasso[,2], color = 'yhat(4 nonzero)'), size = 0.5) + 
+  geom_line(aes(x = x.grid, y = func.lasso[,3], color = 'yhat(8 nonzero)'), size = 0.5)
+```
+
+
+# Problem 3
+
+```{r}
+pos.func <- function(a,b){   # vector a, scalar b;  return (a-b)_{+}
+  c <- a - b
+  return(c * (c > 0))
+}
+
+# function to provide natural cubic regression spline basis
+N.Cubic <- function(x, knots){
+  K <- length(knots)
+  B <- cbind(rep(1, length(x)),x)
+  for (j in 1:(K-2)){
+    c1 <- (knots[K] - knots[j]) / (knots[K] - knots[K-1])
+    c2 <- (knots[K-1] - knots[j]) / (knots[K] - knots[K-1])
+    B.tmp <- pos.func(x, knots[j])^3 - c1 * pos.func(x, knots[K-1])^3 + c2 * pos.func(x, knots[K])^3
+    B <- cbind(B, B.tmp)
+  }
+  colnames(B) <- NULL
+  return(B)
+}
+
+# compute Xh
+knots = c(0, 0.1, 0.3, 0.5, 0.7, 0.9, 1.0) 
+Xh.cubic <- N.Cubic(x.01, knots = knots)
+
+# compute beta_spline and yhat_spline
+beta.cubic.ols <- solve(t(Xh.cubic)%*%Xh.cubic, t(Xh.cubic)%*%Y)
+Yhat.cubic.ols <- Xh.cubic %*% beta.cubic.ols
+
+# plot
+x.grid <- seq(0.001,1,0.001)
+Xh.cubic.full <- N.Cubic(x = x.grid, knots = knots)
+func.cubic.ols <- Xh.cubic.full %*% beta.cubic.ols
+
+ggplot() + geom_point(aes(x = x.01, y = Q2data$y, color = 'y'),size = 0.5) +
+  geom_line(aes(x = x.grid, y = func.cubic.ols, color = 'yhat(OLS)'))
+```
+
+
+
+
+
+
+# Problem 4
+
+## (a)
+
+From notes, we know that:
+
+$$
+\underset{N \times N}{\mathbf{H}}=\left(h_{j}\left(x_{i}\right)\right); \ \ \
+\underset{N \times N}{\Omega}=\left(\int_{0}^{1} h_{j}^{\prime \prime}(t) h_{l}^{\prime \prime}(t) d t\right); \ \ \ 
+\mathbf{K}=\left(\mathbf{H}^{\prime}\right)^{-1} \mathbf{\Omega} \mathbf{H}^{-1}
+$$
+
+
+
+
+$$
+\begin{aligned}
+\because &  h_{j+2}^{\prime \prime}(x)  =  6\left(x-x_{j}\right) I\left[x_{j} \leq x \leq x_{N-1}\right]+6\left(x-x_{N}\right)\left(\frac{x_{j}-x_{N}}{x_{N}-x_{N-1}}\right) I\left[x_{N-1} \leq x \leq x_{N}\right] \\
+\therefore &  \int_{0}^{1}\left(h_{j+2}^{\prime \prime}(x)\right)^{2} d x  =  12\left(\left(x_{N-1}-x_{j}\right)^{3}+\left(x_{N}-x_{N-1}\right)\left(x_{N}-x_{j}\right)^{2}\right) \\
+\therefore &  \int_{0}^{1} h_{j+2}^{\prime \prime}(x) h_{k+2}^{\prime \prime}(x) d x = 12\left(x_{N-1}^{2}-x_{k}^{3}\right)-18\left(x_{j}+x_{k}\right) (x_{N-1}^2 - x_k^2)   +36 x_{j} x_{k}\left(x_{N-1}-x_{k}\right) + \\ & 12\left(x_{N}-x_{N-1}\right)\left(x_{N-1}-x_{j}\right)\left(x_{N-1}-x_{k}\right)
+\end{aligned}
+$$
+
+Therefore, we can code the matrix in R as follow:
+
+
+```{r}
+x <- seq(0,1,0.1)
+y <- c(0, 1.5, 2, 0.5, 0, -0.5, 0, 1.5, 3.5, 4.5, 3.5)
+
+H_mat <- function(x){
+  n <- length(x)
+  H_mat <- matrix(0, ncol = n, nrow = n)
+  H_mat[,1] <- 1
+  H_mat[,2] <- x
+  z_ind <- rep(0,n)
+  for (j in 1:(n-2)){
+    z1 <- pmax(z_ind, x-x[j])
+    z2 <- pmax(z_ind, x-x[n-1])
+    z3 <- pmax(z_ind, x-x[n])
+    H_mat[,2+j] <- z1^3 - ((x[n]-x[j])/(x[n]-x[n-1])) * z2^3 + 
+      ((x[n-1]-x[j])/(x[n]-x[n-1])) * z3^3
+  }
+  return(H_mat)
+}
+
+H <- H_mat(x)
+H
+
+Omega_mat <- function(x){
+  n <- length(x)
+  Omega_mat <- matrix(0, ncol = n, nrow = n)
+  Omega_mat22 <- matrix(0, ncol = n-2, nrow = n-2)
+  for (j in 1:(n-3)){
+    for (k in (j+1):(n-2)){
+      Omega_mat22[j,k] <- 12*(x[n-1]^3 - x[k]^3) - 18*(x[j]+x[k])*(x[n-1]^2 - x[k]^2) + 
+        36*x[j]*x[k]*(x[n-1]-x[k]) + 12*(x[n]-x[n-1])*(x[j]-x[n-1])*(x[k]-x[n-1])
+    }
+   
+  }
+  Omega_mat22_diag <-  12 * ( (x[n-1]-x[1:(n-2)])^3 + (x[n]-x[n-1])*(x[n]-x[1:(n-2)])^2 ) 
+  Omega_mat22 <- Omega_mat22 + t(Omega_mat22)
+  Omega_mat[3:n,3:n] <- Omega_mat22
+  diag(Omega_mat)[3:n] <- Omega_mat22_diag
+  return(Omega_mat)
+}
+
+Omega <- Omega_mat(x)
+Omega
+
+K <- solve(t(H))%*%Omega%*%solve(H)
+round(K,1)
+
+```
+
+
+
+## (b)
+
+```{r}
+
+# eigen analysis of the matrix K
+d_K <- eigen(K, symmetric = TRUE)$values
+P_K <- eigen(K, symmetric = TRUE)$vectors
+
+# plot the eigenvectors
+rP_K <- as.numeric(P_K)
+row_ind <- rep(1:11,11)
+eig_vec_ind <- rep(1:11, each = 11)
+eig_vec_ind <- as.factor(eig_vec_ind)
+D4 <- data.frame(row_ind, y=rP_K, eig_vec_ind)
+
+# all eigenvectors
+ ggplot(data=D4) + 
+  geom_line(aes(x=row_ind, y = y)) + 
+   facet_wrap(~eig_vec_ind, nrow = 3)
+```
+
+
+
+
+Visually speaking, the "shape" of eigenvectors with larger eigenvalues are sharper. The components of a vector of observed values, Y get "most suppressed" in the spanned space of eigenvectors of $\pmb{K}$ with larger eigenvalues. In fact, if the eigenvalue decomposition of $\pmb{K}$ is $\pmb{K} = U\Lambda U^T$, then,
+$$\hat{Y} = U(I +\lambda\Lambda)^{-1}U^T Y = \sum_{i=1}^N \frac{<u_i,Y>}{1+\lambda\Lambda_{ii}}u_i$$
+
+It's not hard to find that $\hat{Y}$ is shrunk more rapidly for larger $\Lambda_{ii}$.
+
+## (c)
+
+
+$$
+\mathbf{S}_{\lambda}=\mathbf{H}\left(\mathbf{H}^{\prime} \mathbf{H}+\lambda \mathbf{\Omega}\right)^{-1} \mathbf{H}^{\prime}  = (\mathbf{I}+\lambda \mathbf{K})^{-1}
+$$
+$$
+\operatorname{df}(\lambda) \equiv \operatorname{tr}\left(\mathbf{S}_{\lambda}\right)
+$$
+
+
+```{r}
+
+# function to compute S_lambda
+S_lam <- function(lambda, H, Omega){
+  S <- H %*% solve(t(H)%*%H + lambda*Omega) %*% t(H)
+  return( S )
+}
+
+# function to compute trace(S_lambda)
+trS_lambda <- function(lambda, H, Omega){
+  S <- H %*% solve(t(H)%*%H + lambda*Omega) %*% t(H)
+  return( sum( diag(S) ) )
+}
+
+# search lambda for certain df
+lambda0 <- seq(0,0.1,0.00001)
+df0 <- rep(0,length(lambda0))
+for (i in 1:length(lambda0)){
+  df0[i] <- trS_lambda(lambda0[i],H,Omega)
+}
+
+plot(log(lambda0), df0, type = "l", xlab = "log(lambda)", ylab = "df")
+abline(h=2.5, lty=2)
+abline(h=3, lty=2)
+abline(h=4, lty=2)
+abline(h=5, lty=2)
+abline(v=log( lambda0[ which.min(abs(df0-2.5)) ] ), lty=2)
+abline(v=log( lambda0[ which.min(abs(df0-3)) ] ), lty=2)
+abline(v=log( lambda0[ which.min(abs(df0-4)) ] ), lty=2)
+abline(v=log( lambda0[ which.min(abs(df0-5)) ] ), lty=2)
+
+# df=2.5
+lambda0[ which.min(abs(df0-2.5)) ]
+
+# df=3
+lambda0[ which.min(abs(df0-3)) ]
+
+# df=4
+lambda0[ which.min(abs(df0-4)) ]
+
+# df=5
+lambda0[ which.min(abs(df0-5)) ]
+
+
+```
+
+
+
+
+
+# Problem 5
+
+## (a)
+
+For kernel smoother, 
+$$
+\underset{N \times 2}{\mathbf{B}}=\left( \begin{array}{cc}{1} & {x_{1}} \\ {\vdots} & {\vdots} \\ {1} & {x_{N}}\end{array}\right) ; \ \ \ 
+\underset{N \times N}{W}\left(x_{0}\right)=\operatorname{diag}\left(K_{\lambda}\left(x_{0}, x_{1}\right), \ldots, K_{\lambda}\left(x_{0}, x_{N}\right)\right);
+$$
+
+$$
+\mathbf{l}^{\prime}\left(x_{0}\right)=\left(1, x_{0}\right)\left(\mathbf{B}^{\prime} \mathbf{W}\left(x_{0}\right) \mathbf{B}\right)^{-1} \mathbf{B}^{\prime} \mathbf{W}\left(x_{0}\right); \ \ \
+\underset{N \times N}{\mathbf{L}_{\lambda}}=\left( \begin{array}{c}{\mathrm{l}^{\prime}\left(x_{1}\right)} \\ {\vdots} \\ {\mathrm{l}^{\prime}\left(x_{N}\right)}\end{array}\right);
+$$
+
+$$ \widehat{\mathbf{Y}}_{\lambda}=\mathbf{L}_{\lambda} \mathbf{Y}; \ \ \   \operatorname{df}(\lambda)=\operatorname{tr}\left(\mathbf{L}_{\lambda}\right). $$
+
+Then for gaussian kernel, we wirte R to find the bandwidth for certain level of effective degrees of freedom.
+
+```{r}
+
+x <- seq(0,1,0.1)
+
+# function to compute l_lambda
+l_lam <- function(x0, x, lambda){
+  n <- length(x)
+  B <- cbind(rep(1,n),x)
+  W_vec <- dnorm(x, mean = x0, sd = lambda)
+  W <- diag(W_vec)
+  l <- t(c(1,x0)) %*% solve( t(B) %*% W %*% B ) %*% t(B) %*% W
+  return( as.numeric(l) )
+}
+
+# function to compute L_lambda
+L_lam <- function(x, lambda){
+  n <- length(x)
+  L <- matrix(0, ncol=n, nrow=n)
+  for (i in 1:n){
+    L[i,] <- l_lam(x[i], x, lambda)
+  }
+  return(L)
+} 
+
+# function to compute trace(L_lambda)
+tr_L_lam <- function(x, lambda){
+  L <- L_lam(x, lambda)
+  return( sum( diag(L) ) )
+}
+
+
+# search for certain df
+log_lambda1 <- seq(-3,0,0.01)
+df1 <- rep(0,length(log_lambda1))
+
+for (i in 1:length(log_lambda1)){
+  df1[i] <- tr_L_lam( x, exp(log_lambda1[i]) )
+}
+
+
+# df=2.5
+exp( log_lambda1[ which.min(abs(df1-2.5)) ] )
+
+# df=3
+exp( log_lambda1[ which.min(abs(df1-3)) ] )
+
+# df=4
+exp( log_lambda1[ which.min(abs(df1-4)) ] )
+
+# df=5
+exp( log_lambda1[ which.min(abs(df1-5)) ] )
+
+# plot
+plot(log_lambda1, df1, type = "l", xlab = "log(lambda)", ylab = "df")
+
+abline(h=2.5, lty=2)
+abline(h=3, lty=2)
+abline(h=4, lty=2)
+abline(h=5, lty=2)
+abline(v= log_lambda1[ which.min(abs(df1-2.5)) ] , lty=2)
+abline(v= log_lambda1[ which.min(abs(df1-3)) ] , lty=2)
+abline(v= log_lambda1[ which.min(abs(df1-4)) ] , lty=2)
+abline(v= log_lambda1[ which.min(abs(df1-5)) ] , lty=2)
+
+
+```
+
+
+
+
+## (b)
+
+```{r}
+# find the smoothing penalty parameter and bandwidth corresponding to df = 4
+l0 <- lambda0[ which.min(abs(df0-4)) ]
+l1 <- exp( log_lambda1[ which.min(abs(df1-4)) ] )
+
+# compute the spline/kernel smoothing matrix
+S4 <- S_lam(l0,H,Omega)
+L4 <- L_lam(x,l1)
+
+# plot spline fit vs kernel fit ( spline:red \ kernel:blue )
+plot(x,y, ylab = "y", pch = 16)
+lines(x, S4%*%y, col="red")
+lines(x, L4%*%y, col="blue")
+
+# plot the 1st, 3rd, 5th row of the two smoothing matrices
+D_p5 <- data.frame(method = rep( c("ss", "ks"), each = 11*3),
+                   col_ind = rep(rep( c("1","3","5"), each=11 ),2),
+                   y = c(S4[1,], S4[3,], S4[5,], L4[1,], L4[3,], L4[5,]),
+                   x = rep(1:11,6))
+
+ggplot(data=D_p5) + geom_line(aes(x=x,y=y,colour=method)) + 
+  facet_wrap(~col_ind, nrow=2)
+
+
+```
+
+
+
+
+# Problem 6
+
+We first search for the bandwidth with 5 and then 9 effective degrees of freedom for tricube kernel in R:
+
+```{r}
+
+# function to compute l_lambda (tricube)
+l_lam_tricube <- function(x0, x, lambda){
+  n <- length(x)
+  B <- cbind(rep(1,n),x)
+  
+  tt <- abs(x-x0)/lambda
+  W_vec <- rep(0,n)
+  ind <- which(tt<1)
+  W_vec[ind] <- (1 - tt[ind]^3)^3
+  W <- diag(W_vec)
+  l <- t(c(1,x0)) %*% solve( t(B) %*% W %*% B ) %*% t(B) %*% W
+  return( as.numeric(l) )
+}
+
+
+# function to compute L_lambda (tricube)
+L_lam_tricube <- function(x, lambda){
+  n <- length(x)
+  L <- matrix(0, ncol=n, nrow=n)
+  for (i in 1:n){
+    L[i,] <- l_lam_tricube(x[i], x, lambda)
+  }
+  return(L)
+} 
+
+
+# function to compute trace(L_lambda) (tricube)
+tr_L_lam_tricube <- function(x, lambda){
+  L <- L_lam_tricube(x, lambda)
+  return( sum( diag(L) ) )
+}
+
+
+
+# search for certain df (df=5 and df=9)
+log_lambda2 <- seq(-2.2,0,0.01)
+df2 <- rep(0,length(log_lambda2))
+
+for (i in 1:length(log_lambda2)){
+  df2[i] <- tr_L_lam_tricube( x, exp(log_lambda2[i]) )
+}
+
+# df=5
+exp( log_lambda2[ which.min(abs(df2-5)) ] )
+
+# df=9
+exp( log_lambda2[ which.min(abs(df2-9)) ] )
+
+
+# plot
+plot(log_lambda2, df2, type = "l", xlab = "log(lambda)", ylab = "df")
+
+
+```
+
+
+Then we fit the data by smoothing spline/ local polynomial:
+
+```{r}
+D6 <- data.frame(x,y)
+
+# local polynomial fit
+library(locpol)
+fit_k5 <- locpol(y~x, data = D6, bw =  0.2515786, kernel = tricubK,
+                 deg = 1)
+fit_k9 <- locpol(y~x, data = D6, bw =   0.127454, kernel = tricubK,
+                 deg = 1)
+
+
+# smoothing spline fit
+fit_s5 <- smooth.spline(x=x, y=y, df=5)
+fit_s9 <- smooth.spline(x=x, y=y, df=9)
+
+
+# compare for df=5 ( spline:red / kernel:blue )
+plot(x,y)
+lines(x, predict(fit_s5)$y, col = "red")
+lines(x, y-fit_k5$residuals, col = "blue")
+
+# compare for df=9 ( spline:red / kernel:blue )
+plot(x,y)
+lines(x, predict(fit_s9)$y, col = "red")
+lines(x, y-fit_k9$residuals, col = "blue")
+
+
+```
+
+
+
+
+
+# Problem 7
+
+```{r,    cache = TRUE}
+wine_data <- read.table('/Users/apple/Desktop/ISU 2019 spring/STAT 602/hw/hw2/winequality-white.csv', header = TRUE, sep = ";")
+
+ols.fit <- lm(quality ~., data = wine_data)
+# ols.fit$coefficients
+
+knn.fit <- train(x = wine_data[,-12], y = wine_data$quality,
+                 method = 'knn', preProcess = c('center', 'scale'),
+                 trControl=trainControl(method="repeatedcv",repeats=10,number=10))
+plot(knn.fit)
+net.fit <- train(x = wine_data[,-12], y = wine_data$quality,
+                 method = 'glmnet', preProcess = c('center', 'scale'),
+                 trControl=trainControl(method="repeatedcv",repeats=10,number=10))
+plot(net.fit)
+pcr.fit <- train(x = wine_data[,-12], y = wine_data$quality,
+                 method = 'pcr', preProcess = c('center', 'scale'),
+                 trControl=trainControl(method="repeatedcv",repeats=10,number=10))
+plot(pcr.fit)
+pls.fit <- train(x = wine_data[,-12], y = wine_data$quality,
+                 method = 'pls', preProcess = c('center', 'scale'),
+                 trControl=trainControl(method="repeatedcv",repeats=10,number=10))
+plot(pls.fit)
+mars.fit <- train(x = wine_data[,-12], y = wine_data$quality,
+                 method = 'earth', preProcess = c('center', 'scale'),
+                 trControl=trainControl(method="repeatedcv",repeats=10,number=10))
+plot(mars.fit)
+
+Model.fit <- list(ols.fit, knn.fit, net.fit, pcr.fit, pls.fit, mars.fit)
+names(Model.fit) <- c('OLS', 'kNN', 'Elastic Net', 'PCR', 'PLS', 'MARS')
+
+Model.pred <- sapply(Model.fit, FUN = predict)
+
+Model.all <- data.frame(y = wine_data$quality, Model.pred)
+
+ggpairs(Model.all, 
+        lower = list(continuous = wrap("points", size=0.1), 
+                     combo = wrap("dot", size=0.2) ))
+
+Corr.y <- cor(Model.all)
+round(Corr.y, digits = 2)
+
+
+```
+
+
+
+# Problem 8
+
+## (a)
+Denote function $T(x_i)(z):=T_i(z)$, then for $L_2$ norm:
+
+$$
+\begin{aligned}
+<T_i, T_j>_{L_2} & = \int_{\mathbb{R}} \exp\{ -\frac{(x_i-x)^2}{2} - \frac{(x_j-x)^2}{2} \} dx \\
+& = \sqrt{\pi} \exp\{-\frac{(x_i-x_j)^2}{4}\}
+\end{aligned}
+$$
+
+
+Define: $\rho_{ij} := \exp\{-\frac{(x_i-x_j)^2}{4}\}$, then:
+
+$$
+\begin{aligned}
+U_1(x) & = T_1(x) \\
+U_2(x) & = T_2(x) - \frac{<T_2,U_1>}{<U_1,U_1>}U_1(x) \\
+U_3(x) & = T_3(x) - \frac{<T_3,U_1>}{<U_1,U_1>}U_1(x) - \frac{<T_3,U_2>}{<U_2,U_2>}U_2(x) \\
+\end{aligned}
+$$
+
+Then:
+$$
+\begin{aligned}
+U_1(x) & = T_1(x) \\
+U_2(x) & = T_2(x) -\rho_{12} T_1(x) \\
+U_3(x) & = T_3(x) - \frac{\rho_{23}-\rho_{12}\rho_{13}}{1-\rho_{12}^2}T_2(x) -  
+\frac{\rho_{13}-\rho_{12}\rho_{23}}{1-\rho_{12}^2}T_1(x)\\
+\end{aligned}
+$$
+
+By standardization, we will have:
+$$
+\begin{aligned}
+Q_1(x) & = \pi^{-1/4} T_1(x) \\
+Q_2(x) & = \pi^{-1/4}\frac{T_2(x) -\rho_{12} T_1(x)}{\sqrt{1-\rho_{12}^2}} \\
+Q_3(x) & = \pi^{-1/4}\frac{T_3(x) - \frac{\rho_{23}-\rho_{12}\rho_{13}}{1-\rho_{12}^2}T_2(x) -  
+\frac{\rho_{13}-\rho_{12}\rho_{23}}{1-\rho_{12}^2}T_1(x)}{
+\sqrt{\frac{1-\rho_{12}^2}{1-\rho_{12}^2 - \rho_{13}^2 - \rho_{23}^2 + 2\rho_{12} \rho_{13} \rho_{23}}}
+}\\
+\end{aligned}
+$$
+
+
+for kernel-based inner product:
+
+$$
+\begin{aligned}
+<T_i, T_j>_{K} & = \mathcal{K}(x_i,x_j) := k_{ij}
+\end{aligned}
+$$
+
+Thus, the orthonormal norm would be:
+$$
+\begin{aligned}
+Q_1(x) & =  T_1(x) \\
+Q_2(x) & = \frac{T_2(x) -k_{12} T_1(x)}{\sqrt{1-k_{12}^2}} \\
+Q_3(x) & = \frac{T_3(x) - \frac{k_{23}-k_{12}k_{13}}{1-k_{12}^2}T_2(x) -  
+\frac{k_{13}-k_{12}k_{23}}{1-k_{12}^2}T_1(x)}{
+\sqrt{\frac{1-k_{12}^2}{1-k_{12}^2 - k_{13}^2 - k_{23}^2 + 2k_{12} k_{13} k_{23}}}
+}\\
+\end{aligned}
+$$
+
+Since $\rho_{ij} = \exp\{-\frac{(x_i-x_j)^2}{4}\} \neq  \exp\{-\frac{(x_i-x_j)^2}{2}\} = k_{ij}$, in addition, $\pi^{-1/4}$ is multiplied to the orthonormal basis for $L_2$ norm, the two basis are not the same.
+
+
+
+## (b)
+
+$$
+\boldsymbol{G}=\boldsymbol{K}-\frac{1}{N} \boldsymbol{J} \boldsymbol{K}-\frac{1}{N} \boldsymbol{K} \boldsymbol{J}+\frac{1}{N^{2}} \boldsymbol{J} \boldsymbol{K} \boldsymbol{J}
+$$
+
+
+```{r}
+
+# center y, standardize x
+x <- seq(0,1,0.1)
+y <- c(0, 1.5, 2, 0.5, 0, -0.5, 0, 1.5, 3.5, 4.5, 3.5)
+
+xs <- (x-mean(x))/sd(x)
+z <- y - mean(y)
+
+
+# function to compute kernel matrix (gaussian kernel)
+K_gauss <- function(x){
+  n <- length(x)
+  Ku <- matrix(0, ncol=n, nrow=n)
+  for (i in 1:(n-1)){
+    for (j in (i+1):n){
+      Ku[i,j] <- exp(-((x[i]-x[j])^2)/2)
+    }
+  }
+  K <- Ku + t(Ku) + diag(n)
+  return(K)
+}
+
+
+
+# function to compute Gram matrix (gaussian kernel)
+G_gauss <- function(x){
+  n <- length(x)
+  K <- K_gauss(x)
+  G <- K
+  k1 <- apply(K,2,mean)
+  for (i in 1:n){
+    G[i,] <- G[i,] - k1[i]
+    G[,i] <- G[,i] - k1[i]
+  }
+  G <- G+mean(K)
+  return(G)
+} 
+
+# function to compute Gram matrix (gaussian kernel) : a slower version
+G_gauss1 <- function(x){
+  n <- length(x)
+  K <- K_gauss(x)
+  J <- matrix(1,ncol=n, nrow=n)
+  return( K - (1/n)*J%*%K - (1/n)*K%*%J + (1/(n^2))*J%*%K%*%J )
+} 
+
+
+G <- G_gauss(xs)
+round(G,3)
+
+
+```
+
+
+
+
+## (c)
+
+```{r}
+# compute eigenvectors for G
+eigen(G, symmetric = TRUE)$values
+PG <- eigen(G, symmetric = TRUE)$vectors
+PG
+
+# function to compute S(xi)(t)
+# return a matrix, row i is the value of S(xi)(t)
+S_mat <- function(t, x){
+  n <- length(x)
+  S_mat <- matrix(0, ncol = length(t), nrow = n)
+  T_mat <- matrix(0, ncol = length(t), nrow = n)
+  for (j in 1:n){
+    T_mat[j,] <- exp(-((x[j]-t)^2)/2)
+  }
+  for (i in 1:n){
+    S_mat[i,] <- T_mat[i,] - apply(T_mat, 2, mean)
+  }
+  return(S_mat)
+}
+
+# function to compute the linear combinations of S(xi)(t),
+# the coeficients are eigenvectors.
+# return a matrix, row j is the value of sum(  uij * S(xi)(t)  )
+PS_mat <- function(t,x,PG){
+  S <- S_mat(t,x)
+  n <- length(x)
+  PS <- t(S)%*%PG
+  return(PS)
+}
+
+
+# plot the linear combination of S(xi)(t),
+t0 <- seq(-2,2,0.2)
+PS <- PS_mat(t0, xs, PG)
+nt <- length(t0)
+D8 <- data.frame(t = rep(t0,11), y = as.numeric(PS), 
+                 eigen_ind = as.factor( rep(1:11, each = nt) )
+                 )
+
+ggplot(data = D8) + geom_line(aes(x = t, y = y)) + 
+  facet_wrap(~eigen_ind, nrow=3)
+
+```
+
+We find that the functions become more and more flat (include less information about S(xi)(t)) as the reduce of eigenvalues. 
+
+
+
+## (d)
+
+```{r}
+# function to compute S(x0)(t) = T(x0)(t) - M(x)(t)
+S_func <- function(t, x, x0){
+  n <- length(x)
+  T_mat <- matrix(0, ncol = length(t), nrow = n)
+  for (j in 1:n){
+    T_mat[j,] <- exp(-((x[j]-t)^2)/2)
+  }
+    S_func <- exp(-((x0-t)^2)/2) - apply(T_mat, 2, mean)
+    return(S_func)
+}
+
+
+s_true <- S_func(t0, xs, 0.65)
+
+# OLS fit using the function we have in (c): 
+# we only use the first four functions since the other functions 
+# are really close to the constant function (y=0)
+s_fit <- fitted(lm(s_true~PS[,1:4]))
+
+# plot ( true:black vs fitted:red )
+plot(t0, s_true, type = "l")
+lines(t0, s_fit, col = "red")
+
+```
+
+We find that the fitted function are really close to the true function.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
